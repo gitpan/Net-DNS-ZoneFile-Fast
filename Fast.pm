@@ -16,7 +16,7 @@ use vars qw($VERSION);
 use IO::File;
 use Net::DNS;
 
-$VERSION = '0.4';
+$VERSION = '0.5';
 
 my $MAXIMUM_TTL = 0x7fffffff;
 
@@ -116,6 +116,8 @@ sub parse
 			$z->{nsdname} = lc $z->{nsdname} if defined $z->{nsdname};
 			$z->{ptrdname} = lc $z->{ptrdname} if defined $z->{ptrdname};
 			$z->{target} = lc $z->{target} if defined $z->{target};
+			$z->{mbox} = lc $z->{mbox} if defined $z->{mbox};
+			$z->{txtdname} = lc $z->{txtdname} if defined $z->{txtdname};
 		} elsif ($param{toupper}) {
 			$z->{name} = uc $z->{name};
 			$z->{cname} = uc $z->{cname} if defined $z->{cname};
@@ -125,6 +127,8 @@ sub parse
 			$z->{nsdname} = uc $z->{nsdname} if defined $z->{nsdname};
 			$z->{ptrdname} = uc $z->{ptrdname} if defined $z->{ptrdname};
 			$z->{target} = uc $z->{target} if defined $z->{target};
+			$z->{mbox} = uc $z->{mbox} if defined $z->{mbox};
+			$z->{txtdname} = uc $z->{txtdname} if defined $z->{txtdname};
 		}
 		push @r, Net::DNS::RR->new_from_hash(%$z);
 		$r[-1]->{Line} = $line;
@@ -522,6 +526,42 @@ sub parse_line
 		} else {
 			error("bad SRV data");
 		}
+	} elsif (/\G(rp)[ \t]+/igc) {
+		my $mbox;
+		if (/\G($pat_maybefullname)[ \t]+/gc) {
+			$mbox = $1;
+			$mbox = "$mbox$origin" unless $mbox =~ /\.$/;
+			chop $mbox;
+		} elsif (/\G\@[ \t]+/gc) {
+			$mbox = $origin;
+			$mbox =~ s/^.// unless $mbox eq ".";
+			chop $mbox;
+		} else {
+			error("bad mbox in PTR");
+		}
+
+		my $txtdname;
+		if (/\G($pat_maybefullname)$pat_skip$/gc) {
+			$txtdname = $1;
+			$txtdname = "$txtdname$origin" unless $txtdname =~ /\.$/;
+			chop $txtdname;
+		} elsif (/\G\@$pat_skip$/gc) {
+			$txtdname = $origin;
+			$txtdname =~ s/^.// unless $txtdname eq ".";
+			chop $txtdname;
+		} else {
+			error("bad txtdname in PTR");
+		}
+
+		push @zone, {
+			Line     => $ln,
+			name     => $domain,
+			type     => "RP",
+			ttl      => $ttl,
+			class    => "IN",
+			mbox     => $mbox,
+			txtdname => $txtdname,
+		};
 	} else {
 		error("unrecognized type");
 	}
@@ -749,6 +789,8 @@ The module currently understands:
 =item B<NS> records
 
 =item B<PTR> records
+
+=item B<RP> records
 
 =item B<SOA> records
 

@@ -39,6 +39,7 @@ $ORIGIN acme.com.
         IN MX 10 mail1.acme.com.
         3600 MX 20 mail2.acme.com.
         MX 30 coyote.acme.com.
+        RP postmaster @
 
 dns1		1000 IN A	1.2.3.4
 dns2.acme.com.	1000 IN A	1.2.3.5
@@ -46,6 +47,7 @@ dns2.acme.com.	1000 IN A	1.2.3.5
 .		IN A		1.2.3.1
 host1		IN A		1.2.3.1
 		IN TXT		"This is the first host"
+        RP tobez.tobez.org. host1
 
 coyote		IN CNAME	@
 
@@ -85,20 +87,24 @@ BEGIN {
        "MX with TTL", 34 ],
      [ Net::DNS::RR->new("acme.com. 600 IN MX 30 coyote.acme.com.")->string,
        "Compact MX", 35 ],
+     [ Net::DNS::RR->new("acme.com. 600 IN RP postmaster.acme.com. acme.com.")->string,
+       "RP with implicit mbox and \@-txtdname", 36 ],
      [ Net::DNS::RR->new("dns1.acme.com. 1000 IN A 1.2.3.4")->string,
-       "Simple A RR", 37 ],
+       "Simple A RR", 38 ],
      [ Net::DNS::RR->new("dns2.acme.com. 1000 IN A 1.2.3.5")->string,
-       "FQDN A RR", 38 ],
+       "FQDN A RR", 39 ],
      [ Net::DNS::RR->new("acme.com. 10 IN CNAME host1.acme.com.")->string,
-       "\@ CNAME", 39 ],
+       "\@ CNAME", 40 ],
      [ Net::DNS::RR->new(". 600 IN A 1.2.3.1")->string,
-       "A RR for the root domain (invalid anyway)", 40 ],
+       "A RR for the root domain (invalid anyway)", 41 ],
      [ Net::DNS::RR->new("host1.acme.com. 600 IN A 1.2.3.1")->string,
-       "Simple A RR", 41 ],
+       "Simple A RR", 42 ],
      [ Net::DNS::RR->new("host1.acme.com. 600 IN TXT \"This is the first host\"")->string,
-       "dangling TXT RR", 42 ],
+       "dangling TXT RR", 43 ],
+     [ Net::DNS::RR->new("host1.acme.com. 600 IN RP tobez.tobez.org. host1.acme.com.")->string,
+       "RP with implicit txtdname", 44 ],
      [ Net::DNS::RR->new("coyote.acme.com. 600 IN CNAME acme.com.")->string,
-       "@ on the RHS", 44 ],
+       "@ on the RHS", 46 ],
 
      );
 };

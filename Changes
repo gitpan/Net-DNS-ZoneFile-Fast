@@ -1,5 +1,8 @@
 Revision history for Perl extension Net::DNS::ZoneFile::Fast.
 
+0.5   Thu Apr 15 23:17:56 CEST 2004
+	- add support for RP "Responsible Person" records
+
 0.4   Fri Mar 26 11:06:21 CET 2004
 	- add dependency from Net::DNS
 

@@ -38,6 +38,9 @@ BEGIN {
 	 q{. IN SOA dns1.acme.com. hostmaster.acme.com. ( 1 1 1 1 1 )},
 	 q{@ IN SOA dns1.acme.com. hostmaster.acme.com. ( 1 1 1 1 1 )},
 	 q{. IN SOA dns1.acme.com. hostmaster.acme.com. ( 1 1 1 1 1 )},
+	 q{acme.com. IN AAAA 2001:688:0:102::1:2},
+	 q{acme.com. IN AAAA 2001:688:0:102::3},
+	 q{acme.com. IN RP abuse.acme.com. acme.com.},
 	 );
 }
 
@@ -54,7 +57,3 @@ for my $rrdata (@test) {
     (my $rrtxt = $rrset->[0]->string) =~ s/\s+/ /g;
     is($rrtxt, $rrcorrect, "RR comparison for $rrdata + whitespace");
 }
-
-
-
-
