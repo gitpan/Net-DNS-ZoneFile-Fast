@@ -16,7 +16,7 @@ use vars qw($VERSION);
 use IO::File;
 use Net::DNS;
 
-$VERSION = '0.3';
+$VERSION = '0.4';
 
 my $MAXIMUM_TTL = 0x7fffffff;
 

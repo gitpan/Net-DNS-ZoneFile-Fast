@@ -1,5 +1,8 @@
 Revision history for Perl extension Net::DNS::ZoneFile::Fast.
 
+0.4   Fri Mar 26 11:06:21 CET 2004
+	- add dependency from Net::DNS
+
 0.3   Wed Mar 24 20:01:18 CET 2004
 	- rename the module from Net::DNS::Zone to Net::DNS::ZoneFile::Fast
 	  (after consulting with Net::DNS::ZoneFile's author)
