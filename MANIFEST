@@ -1,6 +1,7 @@
 Changes
 MANIFEST
 Makefile.PL
+README
 Fast.pm
 t/00-load.t
 t/comment.t
@@ -16,3 +17,4 @@ t/rrs.t
 t/soattl.t
 t/ttl.t
 t/zone.t
+META.yml                                 Module meta-data (added by MakeMaker)
