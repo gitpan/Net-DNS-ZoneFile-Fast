@@ -33,7 +33,7 @@
 # OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 # ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
-# $Id: Fast.pm,v 1.4 2005/11/15 00:55:42 hardaker Exp $
+# $Id: Fast.pm,v 1.5 2006/01/02 20:25:25 hardaker Exp $
 #
 package Net::DNS::ZoneFile::Fast;
 # documentation at the __END__ of the file
@@ -45,7 +45,7 @@ use IO::File;
 use Net::DNS;
 use MIME::Base64;
 
-$VERSION = '0.6';
+$VERSION = '0.6.1';
 
 my $MAXIMUM_TTL = 0x7fffffff;
 
@@ -700,7 +700,7 @@ sub parse_line
 		 nxtdname  => lc($1),
 		 typelist  => $2,
 		 typebm    =>
-		 Net::DNS::RR::NSEC::_typestr2typebm(split(/\s+/,$2)),
+		 Net::DNS::RR::NSEC::_typearray2typebm(split(/\s+/,$2)),
 		};
 	  } else {
 	      error("bad NSEC data");
@@ -773,17 +773,21 @@ sub parse_soa_name
 	      $soa->{$soa->{nextkey}} = $1;
 	  } elsif (/\G$pat_skip$/gc) {
 	      return;
-	  } elsif (/\G[ \t]*($pat_name\.)[ \t]/igc) {
+	  } elsif (/\G[ \t]*(\@)[ \t]/igc) {
+	      $soa->{$soa->{nextkey}} = $origin;
+	  }  elsif (/\G[ \t]*($pat_name\.)[ \t]/igc) {
 	      $soa->{$soa->{nextkey}} = $1;
 	  } else {
 	      error("expected valid $soa->{nextkey}");
 	  }
       } else {
-	  if (/\G[ \t]+($pat_maybefullname)/igc) {
+	  if (/\G[ \t]*($pat_maybefullname)/igc) {
 	      $soa->{$soa->{nextkey}} = $1;
 	  } elsif (/\G[ \t]*\($pat_skip$/igc) {
 	      $soa->{breakable} = 1;
 	      return;
+	  } elsif (/\G[ \t]*(\@)[ \t]/igc) {
+	      $soa->{$soa->{nextkey}} = $origin;
 	  } elsif (/\G[ \t]*\(/igc) {
 	      $soa->{breakable} = 1;
 	      $parse->();
