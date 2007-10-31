@@ -15,11 +15,14 @@ BEGIN {
 	 q{10.10.10.10.in-addr.arpa. 300 PTR www.acme.com.},
 	 q{10.10.10.10.in-addr.arpa. IN PTR www.acme.com.},
 	 q{10.10.10.10.in-addr.arpa PTR www.acme.com.},
+         q{10.10/10.10.10.in-addr.arpa. IN PTR www.acme.com.},
 	 q{. 3600 IN NS dns1.acme.com.},
 	 q{acme.com. 3600 IN NS dns1.acme.com.},
 	 q{@ 3600 IN NS dns1.acme.com.},
 	 q{acme.com. 100 IN CNAME www.acme.com.},
-	 q{acme.com 100 IN CNAME www.acme.com.},
+	 q{acme.com  100 IN CNAME www.acme.com.},
+	 q{acme.com. 100 IN DNAME example.com.},
+	 q{acme.com  100 IN DNAME example.com.},
 	 q{text.acme.com. 100 IN TXT "This is a quite long text"},
 	 q{text.acme.com IN TXT "This is another piece"},
 	 q{text.acme.com TXT "This is another piece"},
@@ -41,6 +44,7 @@ BEGIN {
 	 q{acme.com. IN AAAA 2001:688:0:102::1:2},
 	 q{acme.com. IN AAAA 2001:688:0:102::3},
 	 q{acme.com. IN RP abuse.acme.com. acme.com.},
+	 q{acme.com. IN SSHFP 2 1 123456789abcdef67890123456789abcdef67890},
 	 );
 }
 

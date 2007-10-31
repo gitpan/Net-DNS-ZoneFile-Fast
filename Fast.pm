@@ -4,7 +4,7 @@
 # can do whatever you want with this stuff. If we meet some day, and you think
 # this stuff is worth it, you can buy me a beer in return.   Anton Berezin
 # ----------------------------------------------------------------------------
-# Copyright (c) 2005, SPARTA, Inc.
+# Copyright (c) 2005-2007 SPARTA, Inc.
 # All rights reserved.
 #  
 # Redistribution and use in source and binary forms, with or without
@@ -33,7 +33,7 @@
 # OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 # ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
-# $Id: Fast.pm,v 1.8 2006/04/20 00:32:33 hardaker Exp $
+# $Id: Fast.pm 3780 2007-10-31 21:47:13Z hardaker $
 #
 package Net::DNS::ZoneFile::Fast;
 # documentation at the __END__ of the file
@@ -46,14 +46,14 @@ use Net::DNS;
 use Net::DNS::RR;
 use MIME::Base64;
 
-$VERSION = '0.7';
+$VERSION = '0.9';
 
 my $MAXIMUM_TTL = 0x7fffffff;
 
 my $pat_ttl = qr{[\dwdhms]+}i;
 my $pat_skip = qr{\s*(?:;.*)?};
-my $pat_name = qr{[-\w\$\d*]+(?:\.[-\w\$\d]+)*};
-my $pat_maybefullname = qr{[-\w\$\d*]+(?:\.[-\w\$\d]+)*\.?};
+my $pat_name = qr{[-\w\$\d\/*]+(?:\.[-\w\$\d\/]+)*};
+my $pat_maybefullname = qr{[-\w\$\d\/*]+(?:\.[-\w\$\d\/]+)*\.?};
 
 my $debug;
 my $domain;
@@ -74,6 +74,7 @@ my $soft_errors;
 my $fh;
 my @fhs;
 my @lns;
+my $includes_root;
 
 # boot strap optional DNSSEC module functcions
 # (not optional if trying to parse a signed zone, but we don't need
@@ -123,6 +124,7 @@ sub parse
       $param{soft_errors} = 1 if $on_error && !exists $param{soft_errors};
       $quiet = 1 if $on_error && !exists $param{quiet};
       $soft_errors = $param{soft_errors};
+      $includes_root = $param{includes_root};
 
       eval {
 	  if ($fh) {
@@ -159,6 +161,7 @@ sub parse
 	  if ($param{tolower}) {
 	      $z->{name} = lc $z->{name};
 	      $z->{cname} = lc $z->{cname} if defined $z->{cname};
+	      $z->{dname} = lc $z->{dname} if defined $z->{dname};
 	      $z->{exchange} = lc $z->{exchange} if defined $z->{exchange};
 	      $z->{mname} = lc $z->{mname} if defined $z->{mname};
 	      $z->{rname} = lc $z->{rname} if defined $z->{rname};
@@ -170,6 +173,7 @@ sub parse
 	  } elsif ($param{toupper}) {
 	      $z->{name} = uc $z->{name};
 	      $z->{cname} = uc $z->{cname} if defined $z->{cname};
+	      $z->{dname} = uc $z->{dname} if defined $z->{dname};
 	      $z->{exchange} = uc $z->{exchange} if defined $z->{exchange};
 	      $z->{mname} = uc $z->{mname} if defined $z->{mname};
 	      $z->{rname} = uc $z->{rname} if defined $z->{rname};
@@ -209,15 +213,22 @@ sub parse_line
 	      error("no include file specified $_");
 	      return;
 	  }
-	  if (! -f $1) {
-	      error("could not find file $1");
-	      return;
+          my $fn = $1;
+	  if (! -f $fn) {
+              # expand file according to includes_root
+              if ($includes_root && -f $includes_root . '/'. $fn) {
+                  $fn = $includes_root . '/'. $fn;
+              }
+              else {
+                error("could not find file $fn");
+                return;
+              }
 	  }
 	  unshift @fhs, $fh;
 	  unshift @lns, $ln;
-	  $fh = IO::File->new($1, "r");
+	  $fh = IO::File->new($fn, "r");
 	  $ln = 0;
-	  error("cannot open include file $1: $!") unless defined $fh;
+	  error("cannot open include file $fn: $!") unless defined $fh;
 	  return;
       } elsif (/^\$origin[ \t]+/ig) {
 	  if (/\G($pat_maybefullname)$pat_skip$/gc) {
@@ -239,9 +250,31 @@ sub parse_line
 	      my $pat = $3;
 	      error("bad range in \$GENERATE") if $from > $to;
 	      error("\$GENERATE pattern without a wildcard") if $pat !~ /\$/;
+	      my ($lhs, $rhs) = $pat =~ /(\S+)\s+\S+\s+(\S+)/;
+	      my ($l, $loffset, $lwidth, $lbase) = 
+	      	$lhs =~ /(\$)(?:\{(\d+)(?:,(\d+)(?:,([doxX]))?)?\})?/;
+	      if ($l) {
+			$loffset ||= 0;
+			$lwidth ||= 0;
+			$lbase ||= "d";
+	      }
+	      my ($r, $roffset, $rwidth, $rbase) = 
+	      	$rhs =~ /(\$)(?:\{(\d+)(?:,(\d+)(?:,([doxX]))?)?\})?/;
+	      if ($r) {
+			$roffset ||= 0;
+			$rwidth ||= 0;
+			$rbase ||= "d";
+	      }
 	      while ($from <= $to) {
 		  $_ = $pat;
-		  s/\$/$from/g;
+	      	  if ($l) {
+		  	my $lsub = sprintf "%$lwidth$lbase", $loffset + $from;
+			s/\$(\{[0-9doxX,]+\})?/$lsub/;
+		  }
+		  if ($r) {
+		  	my $rsub = sprintf "%$rwidth$rbase", $roffset + $from;
+			s/\$(\{[0-9doxX,]+\})?/$rsub/;
+		  }
 		  $parse->();
 		  $from++;
 	      }
@@ -389,6 +422,34 @@ sub parse_line
 	  } else {
 	      error("bad cname in CNAME");
 	  }
+      } elsif (/\G(dname)[ \t]+/igc) {
+	  if (/\G($pat_maybefullname)$pat_skip$/gc) {
+	      my $name = $1;
+	      $name = "$name$origin" unless $name =~ /\.$/;
+	      chop $name;
+	      push @zone, {
+			   Line  => $ln,
+			   name  => $domain,
+			   type  => "DNAME",
+			   ttl   => $ttl,
+			   class => "IN",
+			   dname => $name,
+			  };
+	  } elsif (/\G\@$pat_skip$/gc) {
+	      my $name = $origin;
+	      $name =~ s/^.// unless $name eq ".";
+	      chop $name;
+	      push @zone, {
+			   Line     => $ln,
+			   name     => $domain,
+			   type     => "DNAME",
+			   ttl      => $ttl,
+			   class    => "IN",
+			   dname    => $name,
+			  };
+	  } else {
+	      error("bad dname in DNAME");
+	  }
       } elsif (/\G(mx)[ \t]+/igc) {
 	  my $prio;
 	  if (/\G(\d+)[ \t]+/gc) {
@@ -423,7 +484,7 @@ sub parse_line
 			   exchange   => $name,
 			  };
 	  } else {
-	      error("bad exchange in CNAME");
+	      error("bad exchange in MX");
 	  }
       } elsif (/\G(aaaa)[ \t]+/igc) {
 	  if (/\G([\da-fA-F:.]+)$pat_skip$/) {
@@ -475,7 +536,7 @@ sub parse_line
 			   type    => "NS",
 			   ttl     => $ttl,
 			   class   => "IN",
-			   nsdname => $name,
+			   nsdname => lc($name),
 			  };
 	  } elsif (/\G\@$pat_skip$/gc) {
 	      my $name = $origin;
@@ -487,7 +548,7 @@ sub parse_line
 			   type    => "NS",
 			   ttl     => $ttl,
 			   class   => "IN",
-			   nsdname => $name,
+			   nsdname => lc($name),
 			  };
 	  } else {
 	      error("bad name in NS");
@@ -517,6 +578,21 @@ sub parse_line
 			  };
 	  } else {
 	      error("bad txtdata in TXT");
+	  }
+      } elsif (/\G(sshfp)[ \t]+/igc) {
+	  if (/\G(\d+)\s+(\d+)\s+(.*)$pat_skip$/gc) {
+	      push @zone, {
+			   Line    => $ln,
+			   name    => $domain,
+			   type    => "SSHFP",
+			   ttl     => $ttl,
+			   class   => "IN",
+			   algorithm => $1,
+			   fptype => $2,
+			   fingerprint => $3,
+			  };
+	  } else {
+	      error("bad data in in SSHFP");
 	  }
       } elsif (/\G(loc)[ \t]+/igc) {
 	  # parsing stolen from Net::DNS::RR::LOC
@@ -709,7 +785,7 @@ sub parse_line
 		 class     => "IN",
 		 ttl       => $ttl,
 		 type      => "NSEC",
-		 nxtdname  => lc($1),
+		 nxtdname  => $1,
 		 typelist  => $2,
 		 typebm    =>
 		 Net::DNS::RR::NSEC::_typearray2typebm(split(/\s+/,$2)),
@@ -753,6 +829,27 @@ sub parse_line
 		       mbox     => $mbox,
 		       txtdname => $txtdname,
 		      };
+      } elsif (/\G(naptr)[ \t]+/igc) {
+          # Parsing taken from Net::DNS::RR::NAPTR
+          if (!/\G(\d+) \s+ (\d+) \s+ ['"] (.*?) ['"] \s+ ['"] (.*?) ['"] \s+ ['"] (.*?) ['"] \s+ (\S+)$/xgc) {
+	      error("bad NAPTR data");
+          }
+          push @zone, 
+            {
+              Line      => $ln,
+              name      => $domain,
+              class     => "IN",
+              ttl       => $ttl,
+              type      => "NAPTR",
+
+              order       => $1,
+              preference  => $2,
+              flags       => $3,
+              service     => $4,
+              regexp      => $5,
+              replacement => $6,
+            };
+          $zone[ $#zone ]{replacement} =~ s/\.+$//;
       } elsif (/\Gany\s+tsig.*$/igc) {
 	  # XXX ignore tsigs
       } else {
@@ -809,8 +906,10 @@ sub parse_soa_name
 	  }
       }
       if ($soa->{nextkey} eq "mname") {
+	  $soa->{mname} = lc($soa->{mname});
 	  $soa->{nextkey} = "rname";
       } elsif ($soa->{nextkey} eq "rname") {
+	  $soa->{rname} = lc($soa->{rname});
 	  $soa->{nextkey} = "serial";
 	  $parse = \&parse_soa_number;
       } else {
@@ -1064,6 +1163,8 @@ The module currently understands:
 
 =item B<CNAME> records
 
+=item B<DNAME> records
+
 =item B<HINFO> records
 
 =item B<LOC> records
@@ -1145,6 +1246,14 @@ By default, I<parse> throws an exception on any error.  Set this
 optional parameter to a true value to avoid this.  The default is false,
 unless B<on_error> is also specified, in which case it is true.
 
+=item B<includes_root>
+
+An optional parameter.  By default, any $INCLUDE directives encountered
+will be tested for existance and readablility.  If the base path of the
+included filename is not your current working directory, this test will
+fail.  Set the B<includes_root> to the same as your named.conf file to
+avoid this failure.
+
 =item B<quiet>
 
 An optional parameter.  By default, on any error, the error description
@@ -1199,7 +1308,7 @@ Copyright 2003 by Anton Berezin and catpipe Systems ApS
 
   Anton Berezin
 
-Copyright (c) 2004-2005, SPARTA, Inc.
+Copyright (c) 2004-2006, SPARTA, Inc.
   All rights reserved.
    
   Redistribution and use in source and binary forms, with or without
