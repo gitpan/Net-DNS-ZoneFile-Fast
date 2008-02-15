@@ -33,7 +33,7 @@
 # OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 # ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
-# $Id: Fast.pm 3780 2007-10-31 21:47:13Z hardaker $
+# $Id: Fast.pm 3886 2008-02-15 18:35:39Z hardaker $
 #
 package Net::DNS::ZoneFile::Fast;
 # documentation at the __END__ of the file
@@ -46,7 +46,7 @@ use Net::DNS;
 use Net::DNS::RR;
 use MIME::Base64;
 
-$VERSION = '0.9';
+$VERSION = '0.91';
 
 my $MAXIMUM_TTL = 0x7fffffff;
 
@@ -245,42 +245,27 @@ sub parse_line
 	  }
       } elsif (/^\$generate[ \t]+/ig) {
 	  if (/\G(\d+)\s*-\s*(\d+)\s+(.*)$/) {
-	      my $from = $1;
-	      my $to = $2;
-	      my $pat = $3;
-	      error("bad range in \$GENERATE") if $from > $to;
-	      error("\$GENERATE pattern without a wildcard") if $pat !~ /\$/;
-	      my ($lhs, $rhs) = $pat =~ /(\S+)\s+\S+\s+(\S+)/;
-	      my ($l, $loffset, $lwidth, $lbase) = 
-	      	$lhs =~ /(\$)(?:\{(\d+)(?:,(\d+)(?:,([doxX]))?)?\})?/;
-	      if ($l) {
-			$loffset ||= 0;
-			$lwidth ||= 0;
-			$lbase ||= "d";
-	      }
-	      my ($r, $roffset, $rwidth, $rbase) = 
-	      	$rhs =~ /(\$)(?:\{(\d+)(?:,(\d+)(?:,([doxX]))?)?\})?/;
-	      if ($r) {
-			$roffset ||= 0;
-			$rwidth ||= 0;
-			$rbase ||= "d";
-	      }
-	      while ($from <= $to) {
-		  $_ = $pat;
-	      	  if ($l) {
-		  	my $lsub = sprintf "%$lwidth$lbase", $loffset + $from;
-			s/\$(\{[0-9doxX,]+\})?/$lsub/;
-		  }
-		  if ($r) {
-		  	my $rsub = sprintf "%$rwidth$rbase", $roffset + $from;
-			s/\$(\{[0-9doxX,]+\})?/$rsub/;
-		  }
-		  $parse->();
-		  $from++;
-	      }
-	      return;
+	  	my $from = $1;
+	  	my $to = $2;
+	  	my $pat = $3;
+	  	error("bad range in \$GENERATE") if $from > $to;
+	  	error("\$GENERATE pattern without a wildcard") if $pat !~ /\$/;
+	  	while ($from <= $to) {
+	  		$_ = $pat;
+	  		s{\$ (?:\{ (\d+) (?:, (\d+) (?:, ([doxX]) )? )? \})?}
+	  			{
+	  				my ($offset, $width, $base) = ($1, $2, $3);
+	  				$offset ||= 0;
+	  				$width  ||= 0;
+	  				$base   ||= 'd';
+	  				sprintf "%$width$base", $offset + $from;
+	  			}xge;
+	  		$parse->();
+	  		$from++;
+	  	}
+	  	return;
 	  } else {
-	      error("bad \$GENERATE");
+	  	error("bad \$GENERATE");
 	  }
       } elsif (/^\$ttl\b/ig) {
 	  if (/\G\s+($pat_ttl)$pat_skip$/) {
@@ -567,7 +552,25 @@ sub parse_line
 	  $parse->();
 	  return;
       } elsif (/\G(txt)[ \t]+/igc) {
-	  if (/\G(["']?.*?["']?)$pat_skip$/gc) {
+	  if (/\G('[^']+')$pat_skip$/gc) {
+	      push @zone, {
+			   Line    => $ln,
+			   name    => $domain,
+			   type    => "TXT",
+			   ttl     => $ttl,
+			   class   => "IN",
+			   txtdata => $1,
+			  };
+	  } elsif (/\G("[^"]+")$pat_skip$/gc) {
+	      push @zone, {
+			   Line    => $ln,
+			   name    => $domain,
+			   type    => "TXT",
+			   ttl     => $ttl,
+			   class   => "IN",
+			   txtdata => $1,
+			  };
+	  } elsif (/\G(["']?.*?["']?)$pat_skip$/gc) {
 	      push @zone, {
 			   Line    => $ln,
 			   name    => $domain,
@@ -1296,6 +1299,10 @@ There is also no guarantee that I<parse()> will successfully parse every
 zone parsable by BIND, and no guarantee that BIND will parse every zone
 parsable by I<parse()>.  That said, I<parse()> appears to do the right
 thing on around 50000 real life zones I tested it with.
+
+SOA serial numbers with a decimal point are not supported (they're not
+a legal zonefile contstruct, although bind8 supported them.  Even bind
+is dropping support for them in future releases).
 
 =head1 COPYRIGHT AND LICENSE
 
