@@ -4,7 +4,7 @@
 # can do whatever you want with this stuff. If we meet some day, and you think
 # this stuff is worth it, you can buy me a beer in return.   Anton Berezin
 # ----------------------------------------------------------------------------
-# Copyright (c) 2005-2007 SPARTA, Inc.
+# Copyright (c) 2005-2008 SPARTA, Inc.
 # All rights reserved.
 #  
 # Redistribution and use in source and binary forms, with or without
@@ -33,7 +33,7 @@
 # OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 # ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
-# $Id: Fast.pm 3886 2008-02-15 18:35:39Z hardaker $
+# $Id: Fast.pm 4110 2008-05-26 15:35:40Z hardaker $
 #
 package Net::DNS::ZoneFile::Fast;
 # documentation at the __END__ of the file
@@ -46,7 +46,7 @@ use Net::DNS;
 use Net::DNS::RR;
 use MIME::Base64;
 
-$VERSION = '0.91';
+$VERSION = '1.0';
 
 my $MAXIMUM_TTL = 0x7fffffff;
 
@@ -188,6 +188,12 @@ sub parse
 
 	  if ($newrec->{'type'} eq 'DNSKEY') {
 	      $newrec->setkeytag;
+	  }
+	  if ($newrec->{'type'} eq 'RRSIG') {
+	      # fix an issue with RRSIG's signame being stripped of
+	      # the trailing dot.
+	      $newrec->{'signame'} .= "."
+		if ($newrec->{'signame'} !~ /\.$/);
 	  }
 	  push @r, $newrec;
 	  $r[-1]->{Line} = $line;
@@ -781,6 +787,8 @@ sub parse_line
       } elsif (/\G(nsec)[ \t]+/igc) {
 	  if (/\G\s*($pat_maybefullname)\s+(.*)$pat_skip$/gc) {
 	      # XXX: set the typebm field ourselves?
+	      my ($nxtdname, $typelist) = ($1, $2);
+	      $typelist = join(" ",sort split(/\s+/,$typelist));
 	      push @zone, 
 		{
 		 Line      => $ln,
@@ -788,10 +796,10 @@ sub parse_line
 		 class     => "IN",
 		 ttl       => $ttl,
 		 type      => "NSEC",
-		 nxtdname  => $1,
-		 typelist  => $2,
+		 nxtdname  => $nxtdname,
+		 typelist  => $typelist,
 		 typebm    =>
-		 Net::DNS::RR::NSEC::_typearray2typebm(split(/\s+/,$2)),
+		 Net::DNS::RR::NSEC::_typearray2typebm(split(/\s+/,$typelist)),
 		};
 	  } else {
 	      error("bad NSEC data");
@@ -1315,7 +1323,7 @@ Copyright 2003 by Anton Berezin and catpipe Systems ApS
 
   Anton Berezin
 
-Copyright (c) 2004-2006, SPARTA, Inc.
+Copyright (c) 2004-2008 SPARTA, Inc.
   All rights reserved.
    
   Redistribution and use in source and binary forms, with or without
