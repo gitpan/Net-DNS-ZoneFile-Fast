@@ -33,7 +33,7 @@
 # OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 # ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
-# $Id: Fast.pm 4110 2008-05-26 15:35:40Z hardaker $
+# $Id: Fast.pm 4245 2008-10-07 17:27:14Z hardaker $
 #
 package Net::DNS::ZoneFile::Fast;
 # documentation at the __END__ of the file
@@ -46,7 +46,7 @@ use Net::DNS;
 use Net::DNS::RR;
 use MIME::Base64;
 
-$VERSION = '1.0';
+$VERSION = '1.01';
 
 my $MAXIMUM_TTL = 0x7fffffff;
 
@@ -54,6 +54,7 @@ my $pat_ttl = qr{[\dwdhms]+}i;
 my $pat_skip = qr{\s*(?:;.*)?};
 my $pat_name = qr{[-\w\$\d\/*]+(?:\.[-\w\$\d\/]+)*};
 my $pat_maybefullname = qr{[-\w\$\d\/*]+(?:\.[-\w\$\d\/]+)*\.?};
+my $pat_maybefullnameorroot = qr{(?:\.|[-\w\$\d\/*]+(?:\.[-\w\$\d\/]+)*\.?)};
 
 my $debug;
 my $domain;
@@ -75,6 +76,7 @@ my $fh;
 my @fhs;
 my @lns;
 my $includes_root;
+my $globalerror;
 
 # boot strap optional DNSSEC module functcions
 # (not optional if trying to parse a signed zone, but we don't need
@@ -145,6 +147,7 @@ sub parse
 	  }
       };
       if ($@) {
+	  die "$globalerror (at input line #$ln)" if ($globalerror);
 	  return undef if $param{soft_errors};
 	  die;
       }
@@ -205,7 +208,12 @@ sub parse
 sub error
   {
       if ($on_error) {
-	  $on_error->($ln, @_);
+	  eval { $on_error->($ln, @_) };
+	  if($@ ne '') {
+	      # set global error so parse can die appropriately later.
+	      $globalerror = $@;
+	      die;
+	  }
       } else {
 	  warn "@_, line $ln\n" if $soft_errors && !$quiet;
       }
@@ -277,10 +285,10 @@ sub parse_line
 	  if (/\G\s+($pat_ttl)$pat_skip$/) {
 	      my $v = $1;
 	      $ttl = $default_ttl = ttl_fromtext($v);
-	      if ($default_ttl <= 0 || $default_ttl > $MAXIMUM_TTL) {
+	      if ($default_ttl < 0 || $default_ttl > $MAXIMUM_TTL) {
 		  error("bad TTL value `$v'");
 	      } else {
-		  debug("\$TTL <= $default_ttl\n") if $debug;
+		  debug("\$TTL < $default_ttl\n") if $debug;
 	      }
 	  } else {
 	      error("wrong \$TTL");
@@ -312,7 +320,7 @@ sub parse_line
 	  if ($ttl == 0) {
 	      $ttl = $default_ttl;
 	  } else {
-	      if ($ttl <= 0 || $ttl > $MAXIMUM_TTL) {
+	      if ($ttl < 0 || $ttl > $MAXIMUM_TTL) {
 		  error("bad TTL value `$v'");
 	      }
 	  }
@@ -448,7 +456,7 @@ sub parse_line
 	  } else {
 	      error("bad priority in MX");
 	  }
-	  if (/\G($pat_maybefullname)$pat_skip$/gc) {
+	  if (/\G($pat_maybefullnameorroot)$pat_skip$/gc) {
 	      my $name = $1;
 	      $name = "$name$origin" unless $name =~ /\.$/;
 	      chop $name;
