@@ -4,7 +4,7 @@
 # can do whatever you want with this stuff. If we meet some day, and you think
 # this stuff is worth it, you can buy me a beer in return.   Anton Berezin
 # ----------------------------------------------------------------------------
-# Copyright (c) 2005-2008 SPARTA, Inc.
+# Copyright (c) 2005-2009 SPARTA, Inc.
 # All rights reserved.
 #  
 # Redistribution and use in source and binary forms, with or without
@@ -33,7 +33,7 @@
 # OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 # ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
-# $Id: Fast.pm 4245 2008-10-07 17:27:14Z hardaker $
+# $Id: Fast.pm 4353 2009-02-06 20:57:28Z hardaker $
 #
 package Net::DNS::ZoneFile::Fast;
 # documentation at the __END__ of the file
@@ -46,7 +46,7 @@ use Net::DNS;
 use Net::DNS::RR;
 use MIME::Base64;
 
-$VERSION = '1.01';
+$VERSION = '1.1';
 
 my $MAXIMUM_TTL = 0x7fffffff;
 
@@ -67,6 +67,7 @@ my $ttl;
 my @zone;
 my $soa;
 my $rrsig;
+my $sshfp;
 my $dnskey;
 my $ds;
 my $on_error;
@@ -77,15 +78,18 @@ my @fhs;
 my @lns;
 my $includes_root;
 my $globalerror;
+my $nsec3capable;
 
 # boot strap optional DNSSEC module functcions
 # (not optional if trying to parse a signed zone, but we don't need
 # these modules unless we are.
-eval {
+$nsec3capable = eval {
     require Net::DNS::RR::NSEC;
     require Net::DNS::RR::DNSKEY;
+    require Net::DNS::RR::NSEC3;
+    require Net::DNS::RR::NSEC3PARAM;
+    require MIME::Base32;
 };
-
 
 sub parse
   {
@@ -192,12 +196,16 @@ sub parse
 	  if ($newrec->{'type'} eq 'DNSKEY') {
 	      $newrec->setkeytag;
 	  }
-	  if ($newrec->{'type'} eq 'RRSIG') {
+
+	  # no longer an issue with recent Net::DNS
+	  #if ($newrec->{'type'} eq 'RRSIG') {
 	      # fix an issue with RRSIG's signame being stripped of
 	      # the trailing dot.
-	      $newrec->{'signame'} .= "."
-		if ($newrec->{'signame'} !~ /\.$/);
-	  }
+
+
+	      # $newrec->{'signame'} .= "."
+	      # if ($newrec->{'signame'} !~ /\.$/);
+          #}
 	  push @r, $newrec;
 	  $r[-1]->{Line} = $line;
 	  $r[-1]->{Lines} = $lines;
@@ -597,7 +605,19 @@ sub parse_line
 	      error("bad txtdata in TXT");
 	  }
       } elsif (/\G(sshfp)[ \t]+/igc) {
-	  if (/\G(\d+)\s+(\d+)\s+(.*)$pat_skip$/gc) {
+	  if (/\G(\d+)\s+(\d+)\s+\(\s*$/gc) {
+	      # multi-line
+	      $sshfp = { 
+			Line    => $ln,
+			name    => $domain,
+			type    => "SSHFP",
+			ttl     => $ttl,
+			class   => "IN",
+			algorithm => $1,
+			fptype => $2,
+		       };
+	      $parse = \&parse_sshfp;
+	  } elsif (/\G(\d+)\s+(\d+)\s+(.*)$pat_skip$/gc) {
 	      push @zone, {
 			   Line    => $ln,
 			   name    => $domain,
@@ -812,6 +832,59 @@ sub parse_line
 	  } else {
 	      error("bad NSEC data");
 	  }
+      } elsif (/\G(nsec3)[ \t]+/igc) {
+	  error ("You are missing required modules for NSEC3 support")
+	    if (!$nsec3capable);
+	  if (/\G\s*(\d+)\s+(\d+)\s+(\d+)\s+([-0-9A-Fa-f]+)\s+($pat_maybefullname)\s+(.*)$pat_skip$/gc) {
+	      # XXX: set the typebm field ourselves?
+	      my ($alg, $flags, $iters, $salt, $nxthash, $typelist) =
+		($1, $2, $3, $4, $5, $6);
+	      $typelist = join(" ",sort split(/\s+/,$typelist));
+	      my $binhash = MIME::Base32::decode(uc($nxthash));
+	      push @zone, 
+		{
+		 Line        => $ln,
+		 name        => $domain,
+		 class       => "IN",
+		 ttl         => $ttl,
+		 type        => "NSEC3",
+		 hashalgo    => $alg,
+		 flags       => $flags,
+		 iterations  => $iters,
+		 hnxtname    => $nxthash,
+		 hnxtnamebin => $binhash,
+		 hashlength  => length($binhash),
+		 salt        => $salt,
+		 saltbin     => pack("H*",$salt),
+		 saltlength  => int(length($salt)/2),
+		 typelist    => $typelist,
+		 typebm      =>
+		 Net::DNS::RR::NSEC::_typearray2typebm(split(/\s+/,$typelist)),
+		};
+	  } else {
+	      error("bad NSEC data");
+	  }
+      } elsif (/\G(nsec3param)[ \t]+/igc) {
+	  if (/\G\s*(\d+)\s+(\d+)\s+(\d+)\s+([-0-9A-Fa-f]+)$pat_skip$/gc) {
+	      # XXX: set the typebm field ourselves?
+	      my ($alg, $flags, $iters, $salt) = ($1, $2, $3, $4);
+	      push @zone, 
+		{
+		 Line        => $ln,
+		 name        => $domain,
+		 class       => "IN",
+		 ttl         => $ttl,
+		 type        => "NSEC3PARAM",
+		 hashalgo    => $alg,
+		 flags       => $flags,
+		 iterations  => $iters,
+		 salt        => $salt,
+		 saltbin     => pack("H*",$salt),
+		 saltlength  => int(length($salt)/2),
+		};
+	  } else {
+	      error("bad NSEC data");
+	  }
       } elsif (/\G(rp)[ \t]+/igc) {
 	  my $mbox;
 	  if (/\G($pat_maybefullname)[ \t]+/gc) {
@@ -980,6 +1053,30 @@ sub parse_rrsig
 	      } else {
 		  error("bad rrsig remaining lines");
 	      }
+	  }
+      }
+  }
+
+sub parse_sshfp
+  {
+      # got more data
+      if (/\)\s*$/) {
+	  # last line
+	  if (/\G\s*(\S+)\s*\)\s*$/gc) {
+	      $sshfp->{'fingerprint'} .= $1;
+	      # we're done
+	      $parse = \&parse_line;
+
+	      push @zone, $sshfp;
+	      $sshfp = undef;
+	  } else {
+	      error("bad sshfp last line");
+	  }
+      } else {
+	  if (/\G\s*(\S+)\s*$/gc) {
+	      $sshfp->{'fingerprint'} .= $1;
+	  } else {
+	      error("bad sshfp remaining lines");
 	  }
       }
   }
