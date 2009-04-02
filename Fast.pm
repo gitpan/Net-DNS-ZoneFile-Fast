@@ -33,7 +33,7 @@
 # OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 # ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
-# $Id: Fast.pm 4353 2009-02-06 20:57:28Z hardaker $
+# $Id: Fast.pm 4440 2009-04-02 20:42:51Z hardaker $
 #
 package Net::DNS::ZoneFile::Fast;
 # documentation at the __END__ of the file
@@ -46,7 +46,7 @@ use Net::DNS;
 use Net::DNS::RR;
 use MIME::Base64;
 
-$VERSION = '1.1';
+$VERSION = '1.02';
 
 my $MAXIMUM_TTL = 0x7fffffff;
 
@@ -573,12 +573,13 @@ sub parse_line
 		 };
 	  $parse->();
 	  return;
-      } elsif (/\G(txt)[ \t]+/igc) {
+      } elsif (/\G(txt|spf)[ \t]+/igc) {
+	  my $type = uc($1);
 	  if (/\G('[^']+')$pat_skip$/gc) {
 	      push @zone, {
 			   Line    => $ln,
 			   name    => $domain,
-			   type    => "TXT",
+			   type    => $type,
 			   ttl     => $ttl,
 			   class   => "IN",
 			   txtdata => $1,
@@ -587,7 +588,7 @@ sub parse_line
 	      push @zone, {
 			   Line    => $ln,
 			   name    => $domain,
-			   type    => "TXT",
+			   type    => $type,
 			   ttl     => $ttl,
 			   class   => "IN",
 			   txtdata => $1,
@@ -596,13 +597,13 @@ sub parse_line
 	      push @zone, {
 			   Line    => $ln,
 			   name    => $domain,
-			   type    => "TXT",
+			   type    => $type,
 			   ttl     => $ttl,
 			   class   => "IN",
 			   txtdata => $1,
 			  };
 	  } else {
-	      error("bad txtdata in TXT");
+	      error("bad txtdata in $type");
 	  }
       } elsif (/\G(sshfp)[ \t]+/igc) {
 	  if (/\G(\d+)\s+(\d+)\s+\(\s*$/gc) {
