@@ -33,7 +33,7 @@
 # OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 # ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
-# $Id: Fast.pm 4440 2009-04-02 20:42:51Z hardaker $
+# $Id: Fast.pm 4509 2009-04-30 03:53:09Z hardaker $
 #
 package Net::DNS::ZoneFile::Fast;
 # documentation at the __END__ of the file
@@ -46,7 +46,7 @@ use Net::DNS;
 use Net::DNS::RR;
 use MIME::Base64;
 
-$VERSION = '1.02';
+$VERSION = '1.11';
 
 my $MAXIMUM_TTL = 0x7fffffff;
 
@@ -274,7 +274,7 @@ sub parse_line
 	  	error("\$GENERATE pattern without a wildcard") if $pat !~ /\$/;
 	  	while ($from <= $to) {
 	  		$_ = $pat;
-	  		s{\$ (?:\{ (\d+) (?:, (\d+) (?:, ([doxX]) )? )? \})?}
+	  		s{\$ (?:\{ ([\d+-]+) (?:, (\d+) (?:, ([doxX]) )? )? \})?}
 	  			{
 	  				my ($offset, $width, $base) = ($1, $2, $3);
 	  				$offset ||= 0;
