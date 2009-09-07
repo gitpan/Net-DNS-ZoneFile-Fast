@@ -10,6 +10,8 @@ BEGIN {
 	 q{localhost IN A 127.0.0.1},
 	 q{localhost A 127.0.0.1},
 	 q{localhost. 300 A 127.0.0.1},
+	 q{*.acme.com. 300 IN MX 10 host.acme.com.},
+	 q{*           300 IN MX 10 host.acme.com.},
 	 q{10.10.10.10.in-addr.arpa 300 IN PTR www.acme.com.},
 	 q{10.10.10.10.in-addr.arpa. 300 IN PTR www.acme.com.},
 	 q{10.10.10.10.in-addr.arpa. 300 PTR www.acme.com.},
@@ -44,11 +46,19 @@ BEGIN {
 	 q{. IN SOA dns1.acme.com. hostmaster.acme.com. ( 1 1 1 1 1 )},
 	 q{@ IN SOA dns1.acme.com. hostmaster.acme.com. ( 1 1 1 1 1 )},
 	 q{. IN SOA dns1.acme.com. hostmaster.acme.com. ( 1 1 1 1 1 )},
+         # included te test cpan bug 17745
+	 q{. IN SOA dns1.acme.com. hostmaster.acme.com ( 1 1 1 1 1 )},
+	 q{. IN SOA dns1.acme.com. hostmaster ( 1 1 1 1 1 )},
+	 q{. IN SOA dns1.acme.com hostmaster.acme.com. ( 1 1 1 1 1 )},
+	 q{. IN SOA dns1 hostmaster. ( 1 1 1 1 1 )},
 	 q{. IN SOA @ hostmaster.acme.com. ( 1 1 1 1 1 )},
 	 q{acme.com. IN AAAA 2001:688:0:102::1:2},
 	 q{acme.com. IN AAAA 2001:688:0:102::3},
 	 q{acme.com. IN RP abuse.acme.com. acme.com.},
 	 q{acme.com. IN SSHFP 2 1 123456789ABCDEF67890123456789ABCDEF67890},
+	 q{acme.com. IN HINFO SUN4/110 UNIX},
+	 q{acme.com. IN HINFO "SUN4/110 foo" UNIX},
+	 q{acme.com. IN HINFO "SUN4/110 foo" "UNIX bar"},
 	 );
 }
 

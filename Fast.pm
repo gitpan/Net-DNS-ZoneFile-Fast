@@ -33,7 +33,7 @@
 # OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 # ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
-# $Id: Fast.pm 4509 2009-04-30 03:53:09Z hardaker $
+# $Id: Fast.pm 4700 2009-09-07 22:10:58Z hardaker $
 #
 package Net::DNS::ZoneFile::Fast;
 # documentation at the __END__ of the file
@@ -46,13 +46,13 @@ use Net::DNS;
 use Net::DNS::RR;
 use MIME::Base64;
 
-$VERSION = '1.11';
+$VERSION = '1.12';
 
 my $MAXIMUM_TTL = 0x7fffffff;
 
-my $pat_ttl = qr{[\dwdhms]+}i;
+my $pat_ttl = qr{\d+[\dwdhms]*}i;
 my $pat_skip = qr{\s*(?:;.*)?};
-my $pat_name = qr{[-\w\$\d\/*]+(?:\.[-\w\$\d\/]+)*};
+my $pat_name = qr{[-\*\w\$\d\/*]+(?:\.[-\*\w\$\d\/]+)*};
 my $pat_maybefullname = qr{[-\w\$\d\/*]+(?:\.[-\w\$\d\/]+)*\.?};
 my $pat_maybefullnameorroot = qr{(?:\.|[-\w\$\d\/*]+(?:\.[-\w\$\d\/]+)*\.?)};
 
@@ -694,9 +694,8 @@ sub parse_line
 	      error("bad LOC data");
 	  }
       } elsif (/\G(hinfo)[ \t]+/igc) {
-	  # parsing stolen from Net::DNS::RR::HINFO
-	  if (/\G["'](.*?)["']\s+["'](.*?)["']$pat_skip$/gc) {
-	      push @zone, {
+	  if (/\G(["'].*?["']|\S+)\s+(["'].*?["']|\S+)$pat_skip$/gc) {
+	      my $result = {
 			   Line      => $ln,
 			   name      => $domain,
 			   type      => "HINFO",
@@ -705,6 +704,11 @@ sub parse_line
 			   cpu       => $1,
 			   os        => $2,
 			  };
+	      $result->{'cpu'} =~ s/^["']//;
+	      $result->{'cpu'} =~ s/["']$//;
+	      $result->{'os'} =~ s/^["']//;
+	      $result->{'os'} =~ s/["']$//;
+	      push @zone, $result;
 	  } else {
 	      error("bad HINFO data");
 	  }
@@ -746,7 +750,7 @@ sub parse_line
 	  if (/\G\(\s*$/gc) {
 	      # multi-line
 	      $parse = \&parse_rrsig;
-	  } elsif (/\G(\d+)\s+(\d+)\s+($pat_maybefullname)\s+([^=]+=)\s*/gc) {
+	  } elsif (/\G(\d+)\s+(\d+)\s+($pat_maybefullnameorroot)\s+([^=]+=)\s*/gc) {
 	      # single-line
 	      $rrsig->{'siginception'} = $1;
 	      $rrsig->{'keytag'} = $2;
@@ -814,7 +818,7 @@ sub parse_line
 	      error("bad DS data");
 	  }
       } elsif (/\G(nsec)[ \t]+/igc) {
-	  if (/\G\s*($pat_maybefullname)\s+(.*)$pat_skip$/gc) {
+	  if (/\G\s*($pat_maybefullnameorroot)\s+(.*)$pat_skip$/gc) {
 	      # XXX: set the typebm field ourselves?
 	      my ($nxtdname, $typelist) = ($1, $2);
 	      $typelist = join(" ",sort split(/\s+/,$typelist));
@@ -1028,7 +1032,7 @@ sub parse_rrsig
       # got more data
       if ($rrsig->{'first'}) {
 	  delete $rrsig->{'first'};
-	  if (/\G\s*(\d+)\s+(\d+)\s+($pat_maybefullname)/gc) {
+	  if (/\G\s*(\d+)\s+(\d+)\s+($pat_maybefullnameorroot)/gc) {
 	      $rrsig->{'siginception'} = $1;
 	      $rrsig->{'keytag'} = $2;
 	      $rrsig->{'signame'} = $3;
@@ -1176,8 +1180,8 @@ sub parse_soa_number
 	  }
 	  delete $soa->{nextkey};
 	  delete $soa->{breakable};
-	  chop $soa->{mname};
-	  chop $soa->{rname};
+	  $soa->{mname} =~ s/\.$//;
+	  $soa->{rname} =~ s/\.$//;
 	  $soa->{Lines} = $ln - $soa->{Line} + 1;
 	  push @zone, $soa;
 	  $soa = undef;
