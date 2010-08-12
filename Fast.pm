@@ -4,7 +4,7 @@
 # can do whatever you want with this stuff. If we meet some day, and you think
 # this stuff is worth it, you can buy me a beer in return.   Anton Berezin
 # ----------------------------------------------------------------------------
-# Copyright (c) 2005-2009 SPARTA, Inc.
+# Copyright (c) 2005-2010 SPARTA, Inc.
 # All rights reserved.
 #  
 # Redistribution and use in source and binary forms, with or without
@@ -33,7 +33,7 @@
 # OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 # ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
-# $Id: Fast.pm 4700 2009-09-07 22:10:58Z hardaker $
+# $Id$
 #
 package Net::DNS::ZoneFile::Fast;
 # documentation at the __END__ of the file
@@ -46,7 +46,7 @@ use Net::DNS;
 use Net::DNS::RR;
 use MIME::Base64;
 
-$VERSION = '1.12';
+$VERSION = '1.13';
 
 my $MAXIMUM_TTL = 0x7fffffff;
 
@@ -68,6 +68,7 @@ my @zone;
 my $soa;
 my $rrsig;
 my $sshfp;
+my $key;
 my $dnskey;
 my $ds;
 my $on_error;
@@ -80,7 +81,7 @@ my $includes_root;
 my $globalerror;
 my $nsec3capable;
 
-# boot strap optional DNSSEC module functcions
+# boot strap optional DNSSEC module functions
 # (not optional if trying to parse a signed zone, but we don't need
 # these modules unless we are.
 $nsec3capable = eval {
@@ -730,6 +731,35 @@ sub parse_line
 	  } else {
 	      error("bad SRV data");
 	  }
+      } elsif (/\G(key)[ \t]+/igc) {
+	  if (!/\G(\d+)\s+(\d+)\s+(\d+)\s+/gc) {
+	      error("bad KEY data 1");
+	  }
+	  $dnskey = {
+		     first     => 1,
+		     Line      => $ln,
+		     name      => $domain,
+		     ttl       => $ttl,
+		     class     => "IN",
+		     type      => "KEY",
+		     flags     => $1,
+		     protocol  => $2,
+		     algorithm => $3
+		    };
+	  if (/\G\(\s*$/gc) {
+	      # multi-line
+	      $parse = \&parse_dnskey;
+	  } elsif (/\G(.*\S)\s*$/) {
+	      # single-line
+	      $dnskey->{'key'} .= $1;
+	      $dnskey->{'key'} =~ s/\s//g;
+	      $dnskey->{'keybin'} = decode_base64($dnskey->{'key'});
+	      push @zone, $dnskey;
+	      $dnskey = undef;
+	  } else {
+	      error("bad KEY data 2");
+	  }
+
       } elsif (/\G(rrsig)[ \t]+/igc) {
 	  if (!/\G(\w+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+/gc) {
 	      error("bad RRSIG data 1");
@@ -780,7 +810,7 @@ sub parse_line
 	  if (/\G\(\s*$/gc) {
 	      # multi-line
 	      $parse = \&parse_dnskey;
-	  } elsif (/\G(.*\S)\s*$/) {
+	  } elsif (/\G([\sA-Za-z0-9\+\/=]+).*$/) {
 	      # single-line
 	      $dnskey->{'key'} .= $1;
 	      $dnskey->{'key'} =~ s/\s//g;
@@ -811,6 +841,7 @@ sub parse_line
 	      # single line
 	      $ds->{'digest'} .= $1;
 	      $ds->{'digest'} = lc($ds->{'digest'});
+	      $ds->{'digest'} =~ s/\s//g;
 	      $ds->{'digestbin'} = pack("H*", $ds->{'digest'});
 	      push @zone, $ds;
 	      $ds = undef;
@@ -1370,7 +1401,7 @@ unless B<on_error> is also specified, in which case it is true.
 =item B<includes_root>
 
 An optional parameter.  By default, any $INCLUDE directives encountered
-will be tested for existance and readablility.  If the base path of the
+will be tested for existence and readability.  If the base path of the
 included filename is not your current working directory, this test will
 fail.  Set the B<includes_root> to the same as your named.conf file to
 avoid this failure.
@@ -1411,7 +1442,7 @@ either via hash lookup (C<$rr-E<gt>{Line}>), or via an accessor method
 
 =head1 BUGS
 
-The I<parse()> subroutine is not re-entrant.  Plobably will never be.
+The I<parse()> subroutine is not re-entrant, and it probably will never be.
 
 There is also no guarantee that I<parse()> will successfully parse every
 zone parsable by BIND, and no guarantee that BIND will parse every zone
@@ -1433,7 +1464,7 @@ Copyright 2003 by Anton Berezin and catpipe Systems ApS
 
   Anton Berezin
 
-Copyright (c) 2004-2008 SPARTA, Inc.
+Copyright (c) 2004-2010 SPARTA, Inc.
   All rights reserved.
    
   Redistribution and use in source and binary forms, with or without
@@ -1465,7 +1496,7 @@ Copyright (c) 2004-2008 SPARTA, Inc.
 =head1 CREDITS
 
 Anton Berezin created the versions up until 0.5.  Wes Hardaker at
-Sparta implemented the DNSSEC patches and took over maintaince of the
+Sparta implemented the DNSSEC patches and took over maintenance of the
 module from 0.6 onward.
 
 Anton's original CREDITS section:
