@@ -33,7 +33,7 @@
 # OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 # ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
-# $Id$
+# $Id: Fast.pm 5202 2010-09-07 13:05:37Z hardaker $
 #
 package Net::DNS::ZoneFile::Fast;
 # documentation at the __END__ of the file
@@ -46,7 +46,7 @@ use Net::DNS;
 use Net::DNS::RR;
 use MIME::Base64;
 
-$VERSION = '1.13';
+$VERSION = '1.14';
 
 my $MAXIMUM_TTL = 0x7fffffff;
 
@@ -1211,6 +1211,8 @@ sub parse_soa_number
 	  }
 	  delete $soa->{nextkey};
 	  delete $soa->{breakable};
+          $soa->{mname} .= $origin unless ($soa->{mname} =~ /\.$/);
+          $soa->{rname} .= $origin unless ($soa->{rname} =~ /\.$/);
 	  $soa->{mname} =~ s/\.$//;
 	  $soa->{rname} =~ s/\.$//;
 	  $soa->{Lines} = $ln - $soa->{Line} + 1;
