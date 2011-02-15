@@ -4,7 +4,7 @@
 # can do whatever you want with this stuff. If we meet some day, and you think
 # this stuff is worth it, you can buy me a beer in return.   Anton Berezin
 # ----------------------------------------------------------------------------
-# Copyright (c) 2005-2010 SPARTA, Inc.
+# Copyright (c) 2005-2011 SPARTA, Inc.
 # All rights reserved.
 #  
 # Redistribution and use in source and binary forms, with or without
@@ -33,7 +33,7 @@
 # OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 # ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
-# $Id: Fast.pm 5202 2010-09-07 13:05:37Z hardaker $
+# $Id: Fast.pm 5403 2011-02-15 00:25:58Z hardaker $
 #
 package Net::DNS::ZoneFile::Fast;
 # documentation at the __END__ of the file
@@ -46,7 +46,7 @@ use Net::DNS;
 use Net::DNS::RR;
 use MIME::Base64;
 
-$VERSION = '1.14';
+$VERSION = '1.15';
 
 my $MAXIMUM_TTL = 0x7fffffff;
 
@@ -281,7 +281,7 @@ sub parse_line
 	  				$offset ||= 0;
 	  				$width  ||= 0;
 	  				$base   ||= 'd';
-	  				sprintf "%$width$base", $offset + $from;
+	  				sprintf "%0$width$base", $offset + $from;
 	  			}xge;
 	  		$parse->();
 	  		$from++;
@@ -619,7 +619,7 @@ sub parse_line
 			fptype => $2,
 		       };
 	      $parse = \&parse_sshfp;
-	  } elsif (/\G(\d+)\s+(\d+)\s+(.*)$pat_skip$/gc) {
+	  } elsif (/\G(\d+)\s+(\d+)\s+([a-zA-Z0-9]+)$pat_skip$/gc) {
 	      push @zone, {
 			   Line    => $ln,
 			   name    => $domain,
@@ -849,7 +849,7 @@ sub parse_line
 	      error("bad DS data");
 	  }
       } elsif (/\G(nsec)[ \t]+/igc) {
-	  if (/\G\s*($pat_maybefullnameorroot)\s+(.*)$pat_skip$/gc) {
+	  if (/\G\s*($pat_maybefullnameorroot)\s+(.*?)$pat_skip$/gc) {
 	      # XXX: set the typebm field ourselves?
 	      my ($nxtdname, $typelist) = ($1, $2);
 	      $typelist = join(" ",sort split(/\s+/,$typelist));
@@ -871,7 +871,7 @@ sub parse_line
       } elsif (/\G(nsec3)[ \t]+/igc) {
 	  error ("You are missing required modules for NSEC3 support")
 	    if (!$nsec3capable);
-	  if (/\G\s*(\d+)\s+(\d+)\s+(\d+)\s+([-0-9A-Fa-f]+)\s+($pat_maybefullname)\s+(.*)$pat_skip$/gc) {
+	  if (/\G\s*(\d+)\s+(\d+)\s+(\d+)\s+([-0-9A-Fa-f]+)\s+($pat_maybefullname)\s+(.*?)$pat_skip$/gc) {
 	      # XXX: set the typebm field ourselves?
 	      my ($alg, $flags, $iters, $salt, $nxthash, $typelist) =
 		($1, $2, $3, $4, $5, $6);
@@ -1466,7 +1466,7 @@ Copyright 2003 by Anton Berezin and catpipe Systems ApS
 
   Anton Berezin
 
-Copyright (c) 2004-2010 SPARTA, Inc.
+Copyright (c) 2004-2011 SPARTA, Inc.
   All rights reserved.
    
   Redistribution and use in source and binary forms, with or without
