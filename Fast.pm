@@ -33,7 +33,7 @@
 # OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 # ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
-# $Id: Fast.pm 5403 2011-02-15 00:25:58Z hardaker $
+# $Id: Fast.pm 6169 2011-12-29 23:59:07Z hardaker $
 #
 package Net::DNS::ZoneFile::Fast;
 # documentation at the __END__ of the file
@@ -46,15 +46,22 @@ use Net::DNS;
 use Net::DNS::RR;
 use MIME::Base64;
 
-$VERSION = '1.15';
+$VERSION = '1.16';
 
 my $MAXIMUM_TTL = 0x7fffffff;
 
 my $pat_ttl = qr{\d+[\dwdhms]*}i;
 my $pat_skip = qr{\s*(?:;.*)?};
 my $pat_name = qr{[-\*\w\$\d\/*]+(?:\.[-\*\w\$\d\/]+)*};
-my $pat_maybefullname = qr{[-\w\$\d\/*]+(?:\.[-\w\$\d\/]+)*\.?};
 my $pat_maybefullnameorroot = qr{(?:\.|[-\w\$\d\/*]+(?:\.[-\w\$\d\/]+)*\.?)};
+
+#
+# Added the ability to have a backslash in the SOA username.  This is to
+# provide for the RFC-allowed "Joe\.Jones.example.com" construct to allow
+# dots in usernames.  Keeping the original version here for easy reference.
+#
+# my $pat_maybefullname = qr{[-\w\$\d\/*]+(?:\.[-\w\$\d\/]+)*\.?};
+my $pat_maybefullname   = qr{[-\w\$\d\/*\\]+(?:\.[-\w\$\d\/]+)*\.?};
 
 my $debug;
 my $domain;
@@ -195,7 +202,11 @@ sub parse
 	    Net::DNS::RR->new_from_hash(%$z);
 
 	  if ($newrec->{'type'} eq 'DNSKEY') {
-	      $newrec->setkeytag;
+	      if (ref($newrec) ne 'Net::DNS::RR::DNSKEY') {
+		  warn "Failed to define a DNSSEC object (got: " . ref($newrec) . "); you're probably missing either MIME::Base64 or MIME::Base32";
+	      } else {
+		  $newrec->setkeytag;
+	      }
 	  }
 
 	  # no longer an issue with recent Net::DNS
@@ -606,6 +617,33 @@ sub parse_line
 	  } else {
 	      error("bad txtdata in $type");
 	  }
+      } elsif (/\G(type[0-9]+)[ \t]+/igc) {
+          my $type = $1;
+	  if (/\G\\#\s+(\d+)\s+\(\s(.*)$/gc) {
+	      # multi-line
+	      $sshfp = { 
+			Line    => $ln,
+			name    => $domain,
+			type    => uc $type,
+			ttl     => $ttl,
+			class   => "IN",
+                        fptype  => $1,
+			fingerprint => $2,
+		       };
+	      $parse = \&parse_sshfp;
+	  } elsif (/\G\\#\s+(\d+)\s+(.*)$pat_skip$/gc) {
+	      push @zone, {
+			   Line    => $ln,
+			   name    => $domain,
+			   type    => uc $type,
+			   ttl     => $ttl,
+			   class   => "IN",
+                           fptype  => $1,
+			   fingerprint => $2,
+			  };
+	  } else {
+	      error("bad data in in $type");
+	  }
       } elsif (/\G(sshfp)[ \t]+/igc) {
 	  if (/\G(\d+)\s+(\d+)\s+\(\s*$/gc) {
 	      # multi-line
@@ -842,6 +880,9 @@ sub parse_line
 	      $ds->{'digest'} .= $1;
 	      $ds->{'digest'} = lc($ds->{'digest'});
 	      $ds->{'digest'} =~ s/\s//g;
+	      # remove any surrounding single line ()s
+	      $ds->{'digest'} =~ s/^\(//;
+	      $ds->{'digest'} =~ s/\)$//;
 	      $ds->{'digestbin'} = pack("H*", $ds->{'digest'});
 	      push @zone, $ds;
 	      $ds = undef;
@@ -981,7 +1022,7 @@ sub parse_line
       } elsif (/\Gany\s+tsig.*$/igc) {
 	  # XXX ignore tsigs
       } else {
-	  error("unrecognized type");
+	  error("unrecognized type for $domain\n$_\n");
       }
   }
 
