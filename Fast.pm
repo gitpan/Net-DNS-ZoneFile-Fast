@@ -4,7 +4,7 @@
 # can do whatever you want with this stuff. If we meet some day, and you think
 # this stuff is worth it, you can buy me a beer in return.   Anton Berezin
 # ----------------------------------------------------------------------------
-# Copyright (c) 2005-2011 SPARTA, Inc.
+# Copyright (c) 2005-2012 SPARTA, Inc.
 # All rights reserved.
 #  
 # Redistribution and use in source and binary forms, with or without
@@ -33,7 +33,7 @@
 # OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 # ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
-# $Id: Fast.pm 6169 2011-12-29 23:59:07Z hardaker $
+# $Id: Fast.pm 7066 2012-09-24 21:44:49Z hardaker $
 #
 package Net::DNS::ZoneFile::Fast;
 # documentation at the __END__ of the file
@@ -46,7 +46,7 @@ use Net::DNS;
 use Net::DNS::RR;
 use MIME::Base64;
 
-$VERSION = '1.16';
+$VERSION = '1.17';
 
 my $MAXIMUM_TTL = 0x7fffffff;
 
@@ -799,10 +799,9 @@ sub parse_line
 	  }
 
       } elsif (/\G(rrsig)[ \t]+/igc) {
-	  if (!/\G(\w+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+/gc) {
-	      error("bad RRSIG data 1");
-	  }
-	  $rrsig = {
+	  if (/\G(\w+)\s+(\d+)\s+(\d+)\s+(\d+)\s+/gc) {
+	      # some versions of bind (>=10) put the sig-expir on the first line
+	      $rrsig = {
 		    first     => 1,
 		    Line      => $ln,
 		    name      => $domain,
@@ -813,8 +812,19 @@ sub parse_line
 		    algorithm => $2,
 		    labels    => $3,
 		    orgttl    => $4,
-		    sigexpiration => $5
 		   };
+	  } else {
+	      error("bad RRSIG data 1");
+	  }
+
+	  if (/\G(\d+)\s+/gc) {
+	      # some versions of bind (<10) put the sig-expir on the first line
+	      # and newer ones put it on the next.
+	      $rrsig->{'sigexpiration'} = $1;
+	  } else {
+	      $rrsig->{'needsigexp'} = $1;
+	  }
+
 	  if (/\G\(\s*$/gc) {
 	      # multi-line
 	      $parse = \&parse_rrsig;
@@ -1104,7 +1114,15 @@ sub parse_rrsig
       # got more data
       if ($rrsig->{'first'}) {
 	  delete $rrsig->{'first'};
-	  if (/\G\s*(\d+)\s+(\d+)\s+($pat_maybefullnameorroot)/gc) {
+	  if (exists($rrsig->{'needsigexp'}) &&
+	      /\G\s*(\d+)\s+(\d+)\s+(\d+)\s+($pat_maybefullnameorroot)/gc) {
+	      delete $rrsig->{'needsigexp'};
+	      $rrsig->{'sigexpiration'} = $1;
+	      $rrsig->{'siginception'} = $2;
+	      $rrsig->{'keytag'} = $3;
+	      $rrsig->{'signame'} = $4;
+	  } elsif (!exists($rrsig->{'needsigexp'}) && 
+		   /\G\s*(\d+)\s+(\d+)\s+($pat_maybefullnameorroot)/gc) {
 	      $rrsig->{'siginception'} = $1;
 	      $rrsig->{'keytag'} = $2;
 	      $rrsig->{'signame'} = $3;
@@ -1507,7 +1525,7 @@ Copyright 2003 by Anton Berezin and catpipe Systems ApS
 
   Anton Berezin
 
-Copyright (c) 2004-2011 SPARTA, Inc.
+Copyright (c) 2004-2012 SPARTA, Inc.
   All rights reserved.
    
   Redistribution and use in source and binary forms, with or without
