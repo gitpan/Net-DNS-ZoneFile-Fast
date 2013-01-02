@@ -4,7 +4,7 @@
 # can do whatever you want with this stuff. If we meet some day, and you think
 # this stuff is worth it, you can buy me a beer in return.   Anton Berezin
 # ----------------------------------------------------------------------------
-# Copyright (c) 2005-2012 SPARTA, Inc.
+# Copyright (c) 2005-2013 SPARTA, Inc.
 # All rights reserved.
 #  
 # Redistribution and use in source and binary forms, with or without
@@ -33,7 +33,7 @@
 # OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 # ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
-# $Id: Fast.pm 7066 2012-09-24 21:44:49Z hardaker $
+# $Id: Fast.pm 7292 2013-01-02 19:32:41Z hardaker $
 #
 package Net::DNS::ZoneFile::Fast;
 # documentation at the __END__ of the file
@@ -46,7 +46,7 @@ use Net::DNS;
 use Net::DNS::RR;
 use MIME::Base64;
 
-$VERSION = '1.17';
+$VERSION = '1.18';
 
 my $MAXIMUM_TTL = 0x7fffffff;
 
@@ -61,7 +61,7 @@ my $pat_maybefullnameorroot = qr{(?:\.|[-\w\$\d\/*]+(?:\.[-\w\$\d\/]+)*\.?)};
 # dots in usernames.  Keeping the original version here for easy reference.
 #
 # my $pat_maybefullname = qr{[-\w\$\d\/*]+(?:\.[-\w\$\d\/]+)*\.?};
-my $pat_maybefullname   = qr{[-\w\$\d\/*\\]+(?:\.[-\w\$\d\/]+)*\.?};
+my $pat_maybefullname   = qr{[-\+\w\$\d\/*\\]+(?:\.[-\+\w\$\d\/]+)*\.?};
 
 my $debug;
 my $domain;
@@ -198,8 +198,7 @@ sub parse
 	      $z->{mbox} = uc $z->{mbox} if defined $z->{mbox};
 	      $z->{txtdname} = uc $z->{txtdname} if defined $z->{txtdname};
 	  }
-	  my $newrec = 
-	    Net::DNS::RR->new_from_hash(%$z);
+	  my $newrec = Net::DNS::RR->new(%$z);
 
 	  if ($newrec->{'type'} eq 'DNSKEY') {
 	      if (ref($newrec) ne 'Net::DNS::RR::DNSKEY') {
@@ -1525,7 +1524,7 @@ Copyright 2003 by Anton Berezin and catpipe Systems ApS
 
   Anton Berezin
 
-Copyright (c) 2004-2012 SPARTA, Inc.
+Copyright (c) 2004-2013 SPARTA, Inc.
   All rights reserved.
    
   Redistribution and use in source and binary forms, with or without
