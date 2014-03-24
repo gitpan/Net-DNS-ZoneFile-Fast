@@ -62,7 +62,7 @@
 # OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 # ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
-# $Id: Fast.pm 7870 2013-05-23 22:16:24Z hardaker $
+# $Id$
 #
 package Net::DNS::ZoneFile::Fast;
 # documentation at the __END__ of the file
@@ -75,7 +75,7 @@ use Net::DNS;
 use Net::DNS::RR;
 use MIME::Base64;
 
-$VERSION = '1.21';
+$VERSION = '1.22';
 
 my $MAXIMUM_TTL = 0x7fffffff;
 
@@ -1335,7 +1335,20 @@ sub parse_tlsa
 sub parse_nsec3
   {
       #got more data
-      if ( /\G\s*((\w+\s+)*)\)\s*$/) {
+      if ( /\G\s*([A-Z0-9]{32})\s*(\))?/gc) {
+         my $nxthash = $1;
+	 my $binhash = MIME::Base32::decode(uc($nxthash));
+         $nsec3->{ 'hnxtname' } = $nxthash;
+         $nsec3->{ 'hnxtnamebin' } = $binhash;
+         $nsec3->{ 'hashlength' } = length( $binhash );
+         if ( defined($2) && $2 eq ')' ) {	# Was RR terminated ?
+	    push @zone, $nsec3; 
+	    # we're done
+	    $parse = \&parse_line;
+            $nsec3 = undef;
+         }
+      } elsif ( /\G\s+$/gc ) {			# Empty line
+      } elsif ( /\G\s*((\w+\s+)*)\)\s*$/) {
          my $typelist = $1;
 	 $typelist = join(" ",sort split(/\s+/,$typelist));
          $nsec3->{ 'typelist' } = $typelist;
@@ -1345,13 +1358,6 @@ sub parse_nsec3
 	 # we're done
 	 $parse = \&parse_line;
          $nsec3 = undef;
-      } elsif ( /\G\s*([A-Z0-9]{32})\s*$/gc) {
-         my $nxthash = $1;
-	 my $binhash = MIME::Base32::decode(uc($nxthash));
-         $nsec3->{ 'hnxtname' } = $nxthash;
-         $nsec3->{ 'hnxtnamebin' } = $binhash;
-         $nsec3->{ 'hashlength' } = length( $binhash );
-      } elsif ( /\G\s+$/gc ) {			# Empty line
       } else {
          error( "bad NSEC3 continuation lines ($_)" );
       } 

@@ -19,3 +19,4 @@ t/ttl.t
 t/zone.t
 t/rr-dnssec.t
 META.yml                                 Module meta-data (added by MakeMaker)
+META.json                                Module JSON meta-data (added by MakeMaker)
