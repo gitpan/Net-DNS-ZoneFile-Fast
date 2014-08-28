@@ -22,4 +22,4 @@ requires:
   MIME::Base64: 0
   Net::DNS: 0.65
   Net::DNS::SEC: 0.15
-version: 1.22
+version: 1.23

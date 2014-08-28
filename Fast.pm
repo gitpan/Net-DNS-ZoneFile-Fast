@@ -62,7 +62,7 @@
 # OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 # ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
-# $Id$
+# $Id: Fast.pm 8298 2014-08-28 18:31:44Z hardaker $
 #
 package Net::DNS::ZoneFile::Fast;
 # documentation at the __END__ of the file
@@ -75,7 +75,7 @@ use Net::DNS;
 use Net::DNS::RR;
 use MIME::Base64;
 
-$VERSION = '1.22';
+$VERSION = '1.23';
 
 my $MAXIMUM_TTL = 0x7fffffff;
 
@@ -1310,8 +1310,10 @@ sub parse_tlsa
   {
       # got more data
       if (/\)\s*$/) {
-	  if (/\G\s*(\S*)\s*\)\s*$/gc) {
+	  while (/\G\s*([0-9A-Za-z]+)\s*/gc) {
 	      $tlsa->{'cert'} .= $1;
+	  }
+	  if (/\G\s*\)$/gc) {
 	      $tlsa->{'cert'} = lc($tlsa->{'cert'});
 
 	      # we're done
@@ -1321,7 +1323,7 @@ sub parse_tlsa
 	      push @zone, $tlsa;
 	      $tlsa = undef;
 	  } else {
-	      error("bad tlsa last line");
+	      error("bad tlsa last line: $_");
 	  }
       } else {
 	  if (/\G\s*(\S+)\s*$/gc) {
