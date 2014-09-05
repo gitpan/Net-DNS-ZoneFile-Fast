@@ -62,7 +62,7 @@
 # OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 # ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
-# $Id: Fast.pm 8298 2014-08-28 18:31:44Z hardaker $
+# $Id: Fast.pm 8304 2014-09-05 17:20:49Z hardaker $
 #
 package Net::DNS::ZoneFile::Fast;
 # documentation at the __END__ of the file
@@ -75,7 +75,7 @@ use Net::DNS;
 use Net::DNS::RR;
 use MIME::Base64;
 
-$VERSION = '1.23';
+$VERSION = '1.24';
 
 my $MAXIMUM_TTL = 0x7fffffff;
 

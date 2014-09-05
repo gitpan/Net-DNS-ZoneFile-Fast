@@ -2,10 +2,7 @@
 abstract: unknown
 author:
   - unknown
-build_requires:
-  ExtUtils::MakeMaker: 0
-configure_requires:
-  ExtUtils::MakeMaker: 0
+build_requires: {}
 dynamic_config: 1
 generated_by: 'ExtUtils::MakeMaker version 6.64, CPAN::Meta::Converter version 2.120921'
 license: unknown
@@ -17,9 +14,6 @@ no_index:
   directory:
     - t
     - inc
-requires:
-  IO::File: 0
-  MIME::Base64: 0
-  Net::DNS: 0.65
-  Net::DNS::SEC: 0.15
-version: 1.23
+resources:
+  repository: https://dnssec-tools.org/svn/dnssec-tools/
+version: 1.24
